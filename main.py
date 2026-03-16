@@ -1,6 +1,7 @@
 from scapy.all import rdpcap, IP, TCP, UDP
 import argparse
 from collections import Counter
+from detection_rules import detect_threats
 
 GREEN = "\033[92m"
 RESET = "\033[0m"
@@ -57,9 +58,16 @@ def main():
         ("Top Destination Ports", stats_result["top_dst_ports"]),
     ]
 
-    for title, data in sections:
-        print_section(title, data)
+    detections = detect_threats(parsed_packets)
 
+    detection_sections = [
+        ("Port Scan Findings", detections["port_scan"]),
+        ("High Connection Volume", detections["high_connection_volume"]),
+        ("DNS Query Findings", detections["dns_queries"]),
+    ]
+
+    for title, data in sections + detection_sections:
+        print_section(title, data)
 
 def compute_basic_stats(parsed_packets):
     proto_counter = Counter()
@@ -88,11 +96,19 @@ def print_section(title, data):
 
     print(f"\n{GREEN}{title}{RESET}")
     print("-" * len(title))
+
     if not data:
         print("No data")
         return
-    for key, value in data.items():
-        print(f"{key}: {value}")
+
+    if isinstance(data, dict):
+        for key, value in data.items():
+            print(f"{key}: {value}")
+    elif isinstance(data, list):
+        for item in data:
+            print(item)
+    else:
+        print(data)
 
 if __name__ == "__main__":
     main()
