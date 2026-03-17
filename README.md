@@ -29,5 +29,4 @@ Its main goal is to read PCAP files, extract network/packet information, and lat
 ## Roadmap
 - **v0.4**: improved reporting and output modes.
 - **v0.5**: modular refactor into separate files.
-- **v0.55**: optional threat-intel enrichment.
 
