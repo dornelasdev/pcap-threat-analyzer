@@ -1,10 +1,8 @@
 from scapy.all import rdpcap, IP, TCP, UDP
 import argparse
 from collections import Counter
-from detection_rules import detect_threats
-
-GREEN = "\033[92m"
-RESET = "\033[0m"
+from helpers.detection_rules import detect_threats
+from helpers.reporting import build_report, render_text_report, render_json
 
 def parse_pcap(file_path):
     packets = rdpcap(file_path)
@@ -43,31 +41,27 @@ def parse_pcap(file_path):
     return parsed_packets
 
 def main():
-    parser = argparse.ArgumentParser(description="PCAP parser v0.1")
+    parser = argparse.ArgumentParser(description="PCAP parser v0.4")
 
     parser.add_argument("pcap_file", help="Path to the PCAP file")
+    parser.add_argument(
+        "-o", "--output",
+        choices=["json", "text"],
+        help="Output format: text(default) or json",
+        default="text"
+    )
     args = parser.parse_args()
 
     parsed_packets = parse_pcap(args.pcap_file)
     stats_result = compute_basic_stats(parsed_packets)
-    print("No. of parsed packets:", len(parsed_packets))
-
-    sections = [
-        ("Protocol Counts", stats_result["protocol_counts"]),
-        ("Top Source IPs", stats_result["top_src_ips"]),
-        ("Top Destination Ports", stats_result["top_dst_ports"]),
-    ]
-
     detections = detect_threats(parsed_packets)
 
-    detection_sections = [
-        ("Port Scan Findings", detections["port_scan"]),
-        ("High Connection Volume", detections["high_connection_volume"]),
-        ("DNS Query Findings", detections["dns_queries"]),
-    ]
+    report = build_report(parsed_packets, stats_result, detections)
 
-    for title, data in sections + detection_sections:
-        print_section(title, data)
+    if args.output == "text":
+        render_text_report(report)
+    else:
+        print(render_json(report))
 
 def compute_basic_stats(parsed_packets):
     proto_counter = Counter()
@@ -91,24 +85,6 @@ def compute_basic_stats(parsed_packets):
         "top_dst_ports": dict(dport_counter.most_common(5)),
     }
     return c_stats
-
-def print_section(title, data):
-
-    print(f"\n{GREEN}{title}{RESET}")
-    print("-" * len(title))
-
-    if not data:
-        print("No data")
-        return
-
-    if isinstance(data, dict):
-        for key, value in data.items():
-            print(f"{key}: {value}")
-    elif isinstance(data, list):
-        for item in data:
-            print(item)
-    else:
-        print(data)
 
 if __name__ == "__main__":
     main()
