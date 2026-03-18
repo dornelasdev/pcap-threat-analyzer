@@ -1,5 +1,6 @@
 from scapy.all import rdpcap, IP, TCP, UDP
 import argparse
+import os
 from collections import Counter
 from helpers.detection_rules import detect_threats
 from helpers.reporting import build_report, render_text_report, render_json
@@ -50,18 +51,38 @@ def main():
         help="Output format: text(default) or json",
         default="text"
     )
+    parser.add_argument(
+        "-f", "--output-file",
+        help="Optional file path to save output",
+        default=None
+    )
+
     args = parser.parse_args()
 
     parsed_packets = parse_pcap(args.pcap_file)
     stats_result = compute_basic_stats(parsed_packets)
     detections = detect_threats(parsed_packets)
-
     report = build_report(parsed_packets, stats_result, detections)
 
-    if args.output == "text":
-        render_text_report(report)
+    if args.output == "json":
+        output_content = render_json(report)
+
+        if args.output_file:
+            output_path = args.output_file
+        else:
+            output_path = "outputs/report.json"
+
+        parent_dir = os.path.dirname(output_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(output_content)
+
+        print(f"Report saved to: {output_path}")
     else:
-        print(render_json(report))
+        render_text_report(report)
+
 
 def compute_basic_stats(parsed_packets):
     proto_counter = Counter()
