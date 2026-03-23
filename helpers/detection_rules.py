@@ -3,7 +3,7 @@ from collections import Counter
 
 PORT_SCAN_THRESHOLD = 20
 HIGH_CONNECTION_VOLUME_THRESHOLD = 10
-DNS_THRESHOLD = 20
+DNS_UNIQUE_QUERY_THRESHOLD = 5
 
 def detect_threats(parsed_packets):
     detections = {
@@ -43,21 +43,24 @@ def detect_threats(parsed_packets):
                 "packet_count": packet_count,
             })
 
-    dns_count_by_src_ip = Counter()
+    dns_queries_by_src_ip = defaultdict(set)
 
     for record in parsed_packets:
-        src_ip = record["src_ip"]
-        protocol = record["protocol"]
-        src_port = record["src_port"]
-        dst_port = record["dst_port"]
+        src_ip = record.get("src_ip")
+        dns_query = record.get("dns_query")
 
-        if src_ip is not None and protocol == "UDP" and (src_port == 53 or dst_port == 53):
-            dns_count_by_src_ip[src_ip] += 1
+        if src_ip is not None and dns_query:
+            dns_queries_by_src_ip[src_ip].add(dns_query)
 
-    for src_ip, dns_count in dns_count_by_src_ip.items():
-        if dns_count >= DNS_THRESHOLD:
+    for src_ip, query_set in dns_queries_by_src_ip.items():
+        if len(query_set) >= DNS_UNIQUE_QUERY_THRESHOLD:
             detections["dns_queries"].append({
+                "rule": "high_unique_dns_queries",
+                "severity": "medium",
+                "reason": f"{len(query_set)} unique DNS queries from one source",
                 "src_ip": src_ip,
-                "dns_count": dns_count,
+                "unique_dns_queries": len(query_set),
+                "sample_queries": sorted(list(query_set))[:5],
             })
+
     return detections

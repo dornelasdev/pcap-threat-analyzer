@@ -1,4 +1,4 @@
-from scapy.all import rdpcap, IP, TCP, UDP
+from scapy.all import rdpcap, IP, TCP, UDP, DNS, DNSQR
 import argparse
 import os
 from collections import Counter
@@ -18,6 +18,8 @@ def parse_pcap(file_path):
             "protocol": None,
             "src_port": None,
             "dst_port": None,
+            "dns_query": None,
+            "dns_qtype": None,
         }
 
         if IP in packet:
@@ -36,6 +38,13 @@ def parse_pcap(file_path):
 
             else:
                 packet_record["protocol"] = "IP"
+
+            if DNS in packet and packet[DNS].qd is not None:
+                qname = packet[DNSQR].qname
+                if isinstance(qname, bytes):
+                    qname = qname.decode(errors="ignore")
+                packet_record["dns_query"] = qname.rstrip(".")
+                packet_record["dns_qtype"] = packet[DNSQR].qtype
 
         parsed_packets.append(packet_record)
 
@@ -88,22 +97,28 @@ def compute_basic_stats(parsed_packets):
     proto_counter = Counter()
     srcip_counter = Counter()
     dport_counter = Counter()
+    dns_query_counter = Counter()
 
     for record in parsed_packets:
         protocol = record["protocol"]
         src_ip = record["src_ip"]
         dst_port = record["dst_port"]
+        dns_query = record.get("dns_query")
 
         proto_counter[protocol] += 1
         if src_ip is not None:
             srcip_counter[src_ip] += 1
         if dst_port is not None:
             dport_counter[dst_port] += 1
+        if dns_query:
+            dns_query_counter[dns_query] += 1
 
     c_stats = {
         "protocol_counts": dict(proto_counter),
         "top_src_ips": dict(srcip_counter.most_common(5)),
         "top_dst_ports": dict(dport_counter.most_common(5)),
+        "dns_query_count": sum(dns_query_counter.values()),
+        "top_dns_queries": dict(dns_query_counter.most_common(5)),
     }
     return c_stats
 
