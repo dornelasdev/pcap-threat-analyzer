@@ -1,11 +1,14 @@
 from scapy.all import rdpcap, IP, TCP, UDP, DNS, DNSQR
 import argparse
 import os
+from typing import Any, Dict, List
 from collections import Counter
 from helpers.detection_rules import detect_threats
 from helpers.reporting import build_report, render_text_report, render_json
 
-def parse_pcap(file_path):
+def parse_pcap(file_path: str) -> List[Dict[str, Any]]:
+    """Parse a PCAP file into normalized packet records"""
+
     packets = rdpcap(file_path)
     parsed_packets = []
     for index, packet in enumerate(packets, start=1):
@@ -50,8 +53,10 @@ def parse_pcap(file_path):
 
     return parsed_packets
 
-def main():
-    parser = argparse.ArgumentParser(description="PCAP parser v0.4")
+def main() -> None:
+    """CLI entry point for parsing, detection, and report output."""
+
+    parser = argparse.ArgumentParser(description="PCAP threat analyzer CLI")
 
     parser.add_argument("pcap_file", help="Path to the PCAP file")
     parser.add_argument(
@@ -68,7 +73,18 @@ def main():
 
     args = parser.parse_args()
 
-    parsed_packets = parse_pcap(args.pcap_file)
+    if args.output_file and args.output != "json":
+        parser.error("--output-file is currently supported only with --output json")
+
+    try:
+        parsed_packets = parse_pcap(args.pcap_file)
+    except FileNotFoundError:
+        parser.error(f"PCAP file not found: {args.pcap_file}")
+    except PermissionError:
+        parser.error(f"Permission denied when reading: {args.pcap_file}")
+    except Exception as exc:
+        parser.error(f"Failed to parse PCAP file '{args.pcap_file}': {exc}")
+
     stats_result = compute_basic_stats(parsed_packets)
     detections = detect_threats(parsed_packets)
     report = build_report(parsed_packets, stats_result, detections)
@@ -92,10 +108,11 @@ def main():
     else:
         render_text_report(report)
 
+def compute_basic_stats(parsed_packets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Compute baseline traffic and DNS statistics from parsed packet records."""
 
-def compute_basic_stats(parsed_packets):
     proto_counter = Counter()
-    srcip_counter = Counter()
+    src_ip_counter = Counter()
     dport_counter = Counter()
     dns_query_counter = Counter()
 
@@ -107,20 +124,20 @@ def compute_basic_stats(parsed_packets):
 
         proto_counter[protocol] += 1
         if src_ip is not None:
-            srcip_counter[src_ip] += 1
+            src_ip_counter[src_ip] += 1
         if dst_port is not None:
             dport_counter[dst_port] += 1
         if dns_query:
             dns_query_counter[dns_query] += 1
 
-    c_stats = {
+    stats_result = {
         "protocol_counts": dict(proto_counter),
-        "top_src_ips": dict(srcip_counter.most_common(5)),
+        "top_src_ips": dict(src_ip_counter.most_common(5)),
         "top_dst_ports": dict(dport_counter.most_common(5)),
         "dns_query_count": sum(dns_query_counter.values()),
         "top_dns_queries": dict(dns_query_counter.most_common(5)),
     }
-    return c_stats
+    return stats_result
 
 if __name__ == "__main__":
     main()
