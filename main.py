@@ -70,6 +70,24 @@ def main() -> None:
         help="Optional file path to save output",
         default=None
     )
+    parser.add_argument(
+        "--port-scan-threshold",
+        type=int,
+        default=20,
+        help="Unique destination ports threshold for port-scan detection (default: 20)",
+    )
+    parser.add_argument(
+        "--hcv-threshold",
+        type=int,
+        default=10,
+        help="Packet count threshold for high connection volume detection (default: 10)",
+    )
+    parser.add_argument(
+        "--dns-unique-threshold",
+        type=int,
+        default=5,
+        help="Unique DNS queries threshold per source IP (default: 5)",
+    )
 
     args = parser.parse_args()
 
@@ -86,7 +104,7 @@ def main() -> None:
         parser.error(f"Failed to parse PCAP file '{args.pcap_file}': {exc}")
 
     stats_result = compute_basic_stats(parsed_packets)
-    detections = detect_threats(parsed_packets)
+    detections = detect_threats(parsed_packets, args.port_scan_threshold, args.hcv_threshold, args.dns_unique_threshold)
     report = build_report(parsed_packets, stats_result, detections)
 
     if args.output == "json":

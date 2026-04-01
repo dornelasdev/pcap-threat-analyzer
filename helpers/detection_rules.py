@@ -2,11 +2,13 @@ from collections import defaultdict
 from collections import Counter
 from typing import Dict, List, Any
 
-PORT_SCAN_THRESHOLD = 20
-HIGH_CONNECTION_VOLUME_THRESHOLD = 10
-DNS_UNIQUE_QUERY_THRESHOLD = 5
+def detect_threats(
+        parsed_packets: List[Dict[str, Any]],
+        port_scan_threshold: int,
+        hcv_threshold: int,
+        dns_unique_threshold: int,
+) -> Dict[str, List[Dict[str, Any]]]:
 
-def detect_threats(parsed_packets: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
     """Apply rule-based detections and return grouped findings."""
 
     detections = {
@@ -25,7 +27,7 @@ def detect_threats(parsed_packets: List[Dict[str, Any]]) -> Dict[str, List[Dict[
             src_to_ports[src_ip].add(dst_port)
 
     for src_ip, ports_set in src_to_ports.items():
-        if len(ports_set) >= PORT_SCAN_THRESHOLD:
+        if len(ports_set) >= port_scan_threshold:
             detections["port_scan"].append({
                 "rule": "possible_port_scan",
                 "severity": "medium",
@@ -43,7 +45,7 @@ def detect_threats(parsed_packets: List[Dict[str, Any]]) -> Dict[str, List[Dict[
             src_ip_counter[src_ip] += 1
 
     for src_ip, packet_count in src_ip_counter.items():
-        if packet_count >= HIGH_CONNECTION_VOLUME_THRESHOLD:
+        if packet_count >= hcv_threshold:
             detections["high_connection_volume"].append({
                 "rule": "high_connection_volume",
                 "severity": "low",
@@ -62,7 +64,7 @@ def detect_threats(parsed_packets: List[Dict[str, Any]]) -> Dict[str, List[Dict[
             dns_queries_by_src_ip[src_ip].add(dns_query)
 
     for src_ip, query_set in dns_queries_by_src_ip.items():
-        if len(query_set) >= DNS_UNIQUE_QUERY_THRESHOLD:
+        if len(query_set) >= dns_unique_threshold:
             detections["dns_queries"].append({
                 "rule": "high_unique_dns_queries",
                 "severity": "medium",

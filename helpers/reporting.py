@@ -1,5 +1,6 @@
 import json
 from typing import List, Dict, Any
+from collections import Counter
 
 GREEN = "\033[92m"
 RESET = "\033[0m"
@@ -13,23 +14,28 @@ def build_report(
 
     return {
         "summary": {
-            "total_packets": len(parsed_packets)
+            "total_packets": len(parsed_packets),
+            "detection_summary": build_detection_summary(detections),
         },
         "stats": stats_result,
         "detections": detections
     }
+
 
 def render_text_report(report: Dict[str, Any]) -> None:
     """Render a human-readable report to terminal output."""
 
     print("No. of parsed packets:", report["summary"]["total_packets"])
     print("DNS queries extracted:", report["stats"]["dns_query_count"])
+    print("Total findings:", report["summary"]["detection_summary"]["total_findings"])
 
     sections = [
         ("Protocol Counts", report["stats"]["protocol_counts"]),
         ("Top Source IPs", report["stats"]["top_src_ips"]),
         ("Top Destination Ports", report["stats"]["top_dst_ports"]),
-        ("Top DNS Queries", report["stats"]["top_dns_queries"])
+        ("Top DNS Queries", report["stats"]["top_dns_queries"]),
+        ("Findings by Severity", report["summary"]["detection_summary"]["by_severity"]),
+        ("Findings by Rule", report["summary"]["detection_summary"]["by_rule"])
     ]
     detection_sections = [
         ("Port Scan Findings", report["detections"]["port_scan"]),
@@ -76,4 +82,20 @@ def print_section(title: str, data: Any) -> None:
                     print(f"   sample_queries: {', '.join(item['sample_queries'])}")
             else:
                 print(f"{i}. {item}")
+
+def build_detection_summary(detections: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+    severity_counter = Counter()
+    rule_counter = Counter()
+    total_findings = 0
+
+    for findings in detections.values():
+        total_findings += len(findings)
+        for finding in findings:
+            severity_counter[finding.get("severity", "unknown")] += 1
+            rule_counter[finding.get("rule", "unknown_rule")] += 1
+    return {
+        "total_findings": total_findings,
+        "by_severity": dict(severity_counter),
+        "by_rule": dict(rule_counter),
+    }
 
