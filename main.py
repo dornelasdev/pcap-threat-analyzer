@@ -1,55 +1,57 @@
-from scapy.all import rdpcap, IP, TCP, UDP, DNS, DNSQR
+from scapy.all import PcapReader, IP, TCP, UDP, DNS, DNSQR
 import argparse
 import os
+import time
 from typing import Any, Dict, List
 from collections import Counter
 from helpers.detection_rules import detect_threats
 from helpers.reporting import build_report, render_text_report, render_json
 
+
 def parse_pcap(file_path: str) -> List[Dict[str, Any]]:
     """Parse a PCAP file into normalized packet records"""
 
-    packets = rdpcap(file_path)
     parsed_packets = []
-    for index, packet in enumerate(packets, start=1):
-        packet_record = {
-            "packet_number": index,
-            "timestamp": float(packet.time),
-            "length": len(packet),
-            "src_ip": None,
-            "dst_ip": None,
-            "protocol": None,
-            "src_port": None,
-            "dst_port": None,
-            "dns_query": None,
-            "dns_qtype": None,
-        }
+    with PcapReader(file_path) as packets:
+        for index, packet in enumerate(packets, start=1):
+            packet_record = {
+                "packet_number": index,
+                "timestamp": float(packet.time),
+                "length": len(packet),
+                "src_ip": None,
+                "dst_ip": None,
+                "protocol": None,
+                "src_port": None,
+                "dst_port": None,
+                "dns_query": None,
+                "dns_qtype": None,
+            }
 
-        if IP in packet:
-            packet_record["src_ip"] = packet[IP].src
-            packet_record["dst_ip"] = packet[IP].dst
+            if IP in packet:
+                packet_record["src_ip"] = packet[IP].src
+                packet_record["dst_ip"] = packet[IP].dst
 
-            if TCP in packet:
-                packet_record["protocol"] = "TCP"
-                packet_record["src_port"] = packet[TCP].sport
-                packet_record["dst_port"] = packet[TCP].dport
+                if TCP in packet:
+                    packet_record["protocol"] = "TCP"
+                    packet_record["src_port"] = packet[TCP].sport
+                    packet_record["dst_port"] = packet[TCP].dport
 
-            elif UDP in packet:
-                packet_record["protocol"] = "UDP"
-                packet_record["src_port"] = packet[UDP].sport
-                packet_record["dst_port"] = packet[UDP].dport
+                elif UDP in packet:
+                    packet_record["protocol"] = "UDP"
+                    packet_record["src_port"] = packet[UDP].sport
+                    packet_record["dst_port"] = packet[UDP].dport
 
-            else:
-                packet_record["protocol"] = "IP"
+                else:
+                    packet_record["protocol"] = "IP"
 
-            if DNS in packet and packet[DNS].qd is not None:
-                qname = packet[DNSQR].qname
-                if isinstance(qname, bytes):
-                    qname = qname.decode(errors="ignore")
-                packet_record["dns_query"] = qname.rstrip(".")
-                packet_record["dns_qtype"] = packet[DNSQR].qtype
+                if DNS in packet and packet[DNS].qd is not None:
+                    qname = packet[DNSQR].qname
+                    if isinstance(qname, bytes):
+                        qname = qname.decode(errors="ignore")
+                    packet_record["dns_query"] = qname.rstrip(".")
+                    packet_record["dns_qtype"] = packet[DNSQR].qtype
 
-        parsed_packets.append(packet_record)
+            parsed_packets.append(packet_record)
 
     return parsed_packets
 
@@ -90,12 +92,15 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    pipeline_start = time.perf_counter()
 
     if args.output_file and args.output != "json":
         parser.error("--output-file is currently supported only with --output json")
 
     try:
+        parse_start = time.perf_counter()
         parsed_packets = parse_pcap(args.pcap_file)
+        parse_duration = time.perf_counter() - parse_start
     except FileNotFoundError:
         parser.error(f"PCAP file not found: {args.pcap_file}")
     except PermissionError:
@@ -103,9 +108,21 @@ def main() -> None:
     except Exception as exc:
         parser.error(f"Failed to parse PCAP file '{args.pcap_file}': {exc}")
 
+    safe_duration = max(parse_duration, 1e-6)
+    packet_count = len(parsed_packets)
+    packets_per_second = packet_count / safe_duration
+    total_pipeline_duration = time.perf_counter() - pipeline_start
+
+    runtime_metrics = {
+        "parse_duration_seconds": round(safe_duration, 6),
+        "total_pipeline_seconds": round(max(total_pipeline_duration, 1e-6), 6),
+        "packet_count": packet_count,
+        "packets_per_second": round(packets_per_second, 2)
+    }
+
     stats_result = compute_basic_stats(parsed_packets)
     detections = detect_threats(parsed_packets, args.port_scan_threshold, args.hcv_threshold, args.dns_unique_threshold)
-    report = build_report(parsed_packets, stats_result, detections)
+    report = build_report(parsed_packets, stats_result, detections, runtime_metrics)
 
     if args.output == "json":
         output_content = render_json(report)

@@ -9,6 +9,7 @@ def build_report(
     parsed_packets: List[Dict[str, Any]],
     stats_result: Dict[str, Any],
     detections: Dict[str, List[Dict[str, Any]]],
+    runtime_metrics: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Assemble the final report object."""
 
@@ -16,6 +17,7 @@ def build_report(
         "summary": {
             "total_packets": len(parsed_packets),
             "detection_summary": build_detection_summary(detections),
+            "runtime_metrics": runtime_metrics,
         },
         "stats": stats_result,
         "detections": detections
@@ -28,6 +30,13 @@ def render_text_report(report: Dict[str, Any]) -> None:
     print("No. of parsed packets:", report["summary"]["total_packets"])
     print("DNS queries extracted:", report["stats"]["dns_query_count"])
     print("Total findings:", report["summary"]["detection_summary"]["total_findings"])
+    metrics = report["summary"]["runtime_metrics"]
+    print(
+        f"Parse: {metrics['parse_duration_seconds']}s | "
+        f"Total: {metrics['total_pipeline_seconds']}s | "
+        f"Packets: {metrics['packet_count']} | "
+        f"Rate: {metrics['packets_per_second']} pkt/s"
+    )
 
     sections = [
         ("Protocol Counts", report["stats"]["protocol_counts"]),
