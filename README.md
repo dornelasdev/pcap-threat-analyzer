@@ -8,13 +8,14 @@ A Python-based PCAP threat analyzer.
 Its main goal is to read PCAP files, extract network/packet information, and later expand into traffic analysis and simple threat detection.
 *Current focus is foundation first, not yet focused on full detection.*
 
-## Current Features (v0.8)
+## Current Features (v0.9)
 - PCAP parsing: reads packets and normalizes core fields.
 - Traffic statistics: protocol counts, top source IPs, top destination ports.
 - Threat detection: port scan, high connection volume, DNS query volume patterns.
-- Output modes: readable text report and JSON file export (`-o json`, optional `-f/--output-file`).
+- Output modes: readable text report and file export via -f/--output-file (json or text).
 - DNS-aware analysis: extracts DNS query fields and adds DNS-focused statistics.
 - Runtime metrics for both parsing and pipeline workflows.
+- Improved input and error handling for invalid thresholds, file usage, and cleaner parser errors.
 
 ## Project Structure
 - `main.py`: current entry point for the project.
@@ -29,9 +30,9 @@ Its main goal is to read PCAP files, extract network/packet information, and lat
   - `render_json()`: serializes the report object to JSON output.
   - `print_section()`: formats section output and detection findings for readability.
   - `build_detection_summary()`: summary for report findings.
+  - `render_text_report_impl()`: internal renderer used by text output paths.
 
 ## Roadmap
-- **v0.9**: scalability and robustness improvements (streaming PCAP parsing, better error handling).
 - **v1.0**: stable end-to-end release (reliable parser, stats, detections, documented workflow, reproducible PoC demo).
 
 

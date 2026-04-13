@@ -91,11 +91,26 @@ def main() -> None:
         help="Unique DNS queries threshold per source IP (default: 5)",
     )
 
-    args = parser.parse_args()
-    pipeline_start = time.perf_counter()
+    parser.add_argument(
+        "--detail",
+        choices=["compact", "full"],
+        default="full",
+        help="Report detail level: compact or full (default: full)",
+    )
 
-    if args.output_file and args.output != "json":
-        parser.error("--output-file is currently supported only with --output json")
+    args = parser.parse_args()
+
+    threshold_checks = [
+        ("--port-scan-threshold", args.port_scan_threshold),
+        ("--hcv-threshold", args.hcv_threshold),
+        ("--dns-unique-threshold", args.dns_unique_threshold),
+    ]
+
+    for name, value in threshold_checks:
+        if value < 1:
+            parser.error(f"{name} must be >= 1")
+
+    pipeline_start = time.perf_counter()
 
     try:
         parse_start = time.perf_counter()
@@ -126,22 +141,20 @@ def main() -> None:
 
     if args.output == "json":
         output_content = render_json(report)
+    else:
+        output_content = render_text_report(report, detail=args.detail, to_string=True)
 
-        if args.output_file:
-            output_path = args.output_file
-        else:
-            output_path = "outputs/report.json"
-
+    if args.output_file:
+        output_path = args.output_file
         parent_dir = os.path.dirname(output_path)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
-
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(output_content)
-
         print(f"Report saved to: {output_path}")
     else:
-        render_text_report(report)
+        print(output_content)
+
 
 def compute_basic_stats(parsed_packets: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Compute baseline traffic and DNS statistics from parsed packet records."""
