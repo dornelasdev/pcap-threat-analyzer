@@ -75,20 +75,20 @@ def main() -> None:
     parser.add_argument(
         "--port-scan-threshold",
         type=int,
-        default=20,
-        help="Unique destination ports threshold for port-scan detection (default: 20)",
+        default=40,
+        help="Unique destination ports threshold for port-scan detection (default: 40)",
     )
     parser.add_argument(
         "--hcv-threshold",
         type=int,
-        default=10,
-        help="Packet count threshold for high connection volume detection (default: 10)",
+        default=300,
+        help="Packet count threshold for high connection volume detection (default: 300)",
     )
     parser.add_argument(
         "--dns-unique-threshold",
         type=int,
-        default=5,
-        help="Unique DNS queries threshold per source IP (default: 5)",
+        default=12,
+        help="Unique DNS queries threshold per source IP (default: 12)",
     )
 
     parser.add_argument(
@@ -146,14 +146,25 @@ def main() -> None:
 
     if args.output_file:
         output_path = args.output_file
+
+        if args.output == "json" and not output_path.lower().endswith(".json"):
+            output_path += ".json"
+        if args.output == "text" and not output_path.lower().endswith(".txt"):
+            output_path += ".txt"
+
         parent_dir = os.path.dirname(output_path)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
+
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(output_content)
+
         print(f"Report saved to: {output_path}")
     else:
-        print(output_content)
+        if args.output == "text":
+            render_text_report(report, detail=args.detail, to_string=False)
+        else:
+            print(output_content)
 
 
 def compute_basic_stats(parsed_packets: List[Dict[str, Any]]) -> Dict[str, Any]:

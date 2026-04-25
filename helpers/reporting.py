@@ -26,7 +26,7 @@ def build_report(
     }
 
 
-def render_text_report_impl(report: Dict[str, Any], detail: str = "full") -> None:
+def render_text_report_impl(report: Dict[str, Any], detail: str = "full", use_color: bool = True) -> None:
     """Render a human-readable report to terminal output."""
 
     print("No. of parsed packets:", report["summary"]["total_packets"])
@@ -63,7 +63,7 @@ def render_text_report_impl(report: Dict[str, Any], detail: str = "full") -> Non
         ("DNS Query Findings", report["detections"]["dns_queries"]),
     ]
     for title, data in sections + detection_sections:
-        print_section(title, data)
+        print_section(title, data, use_color=use_color)
 
 def render_text_report(
         report: Dict[str, Any],
@@ -71,12 +71,12 @@ def render_text_report(
         to_string: bool = False,
 ) -> str | None:
     if not to_string:
-        render_text_report_impl(report, detail=detail)
+        render_text_report_impl(report, detail=detail, use_color=True)
         return None
 
     buffer = StringIO()
     with redirect_stdout(buffer):
-        render_text_report_impl(report, detail=detail)
+        render_text_report_impl(report, detail=detail, use_color=False)
         return buffer.getvalue()
 
 def render_json(report: Dict[str, Any]) -> str:
@@ -84,10 +84,13 @@ def render_json(report: Dict[str, Any]) -> str:
 
     return json.dumps(report, indent=2)
 
-def print_section(title: str, data: Any) -> None:
+def print_section(title: str, data: Any, use_color: bool = True) -> None:
     """Print one report section in a readable format."""
 
-    print(f"\n{GREEN}{title}{RESET}")
+    if use_color:
+        print(f"\n{GREEN}{title}{RESET}")
+    else:
+        print(f"\n{title}")
     print("-" * len(title))
 
     if not data:
